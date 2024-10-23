@@ -177,11 +177,24 @@ function reddit_crosspost_submit_post($title, $text, $image_url, $subreddit) {
 }
 
 // Include the GitHub Updater class
-if ( file_exists( plugin_dir_path( __FILE__ ) . 'class-github-updater.php' ) ) {
-    require_once plugin_dir_path( __FILE__ ) . 'class-github-updater.php';
-}
+add_action('plugins_loaded', function() {
+    $file = plugin_dir_path( __FILE__ ) . 'class-github-updater.php';
 
-// Initialize the updater
-add_action( 'init', function() {
-    new GitHub_Updater( 'reddit-crosspost-plugin', 'vestrainteractive/reddit-crosspost-plugin' ); // Replace with your plugin slug and folder name
+    if ( file_exists( $file ) ) {
+        require_once $file;
+        error_log( 'GitHub Updater file included successfully.' );
+    } else {
+        error_log( 'GitHub Updater file not found at: ' . $file );
+    }
+
+    // Ensure the class exists before instantiating
+    if ( class_exists( 'GitHub_Updater' ) ) {
+        // Initialize the updater
+        new GitHub_Updater( 'reddit-crosspost-plugin', 'https://github.com/vestrainteractive/reddit-crosspost-plugin', '1.0.0' ); // Replace with actual values
+        error_log( 'GitHub Updater class instantiated.' );
+    } else {
+        error_log( 'GitHub_Updater class not found.' );
+    }
 });
+
+?>
