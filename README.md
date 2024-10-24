@@ -19,7 +19,7 @@ Upload and activate plugin.
 
 WP Admin > Settings > Reddit Crosspost
 
-Set API information
+Set API information -  Get Reddit API from https://www.reddit.com/prefs/apps/.  
 
 If you want any new posts in certain categories to auto-post to a specific subreddit, enter them in the box below, one per line.  Omit the /r/  For example:
 
