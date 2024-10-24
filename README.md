@@ -27,3 +27,5 @@ tech:technology
 blog:blogs 
 
 If you want to set the subreddit on a per-post basis, you can do that in the post-editor.
+
+Note:  This plugin will NOT auto-update yet.  It is planned for a future version, however.  Check back in 2025 for this functionality.
