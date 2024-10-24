@@ -4,7 +4,7 @@ Plugin URI: https://github.com/vestrainteractive/reddit-crosspost-plugin
 
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
 
-Version: 1.2
+Version: 1.0.8
 
 Author: Vestra Interactive
 
