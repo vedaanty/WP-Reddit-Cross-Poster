@@ -3,308 +3,279 @@
 Plugin Name: Reddit Cross-Post Plugin
 Plugin URI: https://github.com/vestrainteractive/reddit-crosspost-plugin
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-Version: 1.0.8
+Version: 1.0.9
 Author: Vestra Interactive
 Author URI: https://vestrainteractive.com
 */
 
-// Register actions
-add_action('admin_menu', 'reddit_crosspost_add_admin_menu');
-add_action('admin_init', 'reddit_crosspost_settings_init');
-add_action('add_meta_boxes', 'reddit_crosspost_add_meta_box');
-add_action('save_post', 'reddit_crosspost_save_postdata');
-add_action('wp_ajax_reddit_crosspost_manual', 'reddit_crosspost_manual_post');
+// Define a fixed redirect URI as a constant
+define('REDDIT_REDIRECT_URI', 'https://domain.com/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL
 
-// Add options page
-function reddit_crosspost_add_admin_menu() {
-    add_options_page('Reddit Cross-Post', 'Reddit Cross-Post', 'manage_options', 'reddit-crosspost-settings', 'reddit_crosspost_options_page');
+// Add the admin menu for plugin settings
+add_action('admin_menu', 'reddit_cross_poster_menu');
+function reddit_cross_poster_menu() {
+    add_menu_page('Reddit Cross Poster', 'Reddit Cross Poster', 'manage_options', 'reddit-cross-poster', 'reddit_cross_poster_admin_page');
 }
 
-// Initialize plugin settings
-function reddit_crosspost_settings_init() {
-    register_setting('reddit_crosspost_settings', 'reddit_crosspost_client_id');
-    register_setting('reddit_crosspost_settings', 'reddit_crosspost_client_secret');
-    register_setting('reddit_crosspost_settings', 'reddit_crosspost_access_token');
-    register_setting('reddit_crosspost_settings', 'reddit_crosspost_refresh_token');
-    register_setting('reddit_crosspost_settings', 'reddit_crosspost_category_subreddit_mapping');
+// Plugin admin page
+function reddit_cross_poster_admin_page() {
+    // Check if OAuth button was clicked
+    if (isset($_GET['reddit_oauth'])) {
+        reddit_cross_poster_start_oauth();
+    }
 
-    // Add settings section
-    add_settings_section(
-        'reddit_crosspost_settings_section',
-        __('Reddit API Configuration', 'wordpress'),
-        null,
-        'reddit-crosspost-settings'
-    );
+    if (isset($_GET['code']) && isset($_GET['state'])) {
+        reddit_cross_poster_handle_oauth_response($_GET['code']);
+    }
 
-    // Add settings fields
-    add_settings_field(
-        'reddit_crosspost_client_id',
-        __('Reddit Client ID', 'wordpress'),
-        'reddit_crosspost_client_id_render',
-        'reddit-crosspost-settings',
-        'reddit_crosspost_settings_section'
-    );
-
-    add_settings_field(
-        'reddit_crosspost_client_secret',
-        __('Reddit Client Secret', 'wordpress'),
-        'reddit_crosspost_client_secret_render',
-        'reddit-crosspost-settings',
-        'reddit_crosspost_settings_section'
-    );
-
-    add_settings_field(
-        'reddit_crosspost_category_subreddit_mapping',
-        __('Category to Subreddit Mapping', 'wordpress'),
-        'reddit_crosspost_mapping_render',
-        'reddit-crosspost-settings',
-        'reddit_crosspost_settings_section'
-    );
-}
-
-// Render client ID field
-function reddit_crosspost_client_id_render() {
-    $client_id = get_option('reddit_crosspost_client_id');
-    echo '<input type="text" name="reddit_crosspost_client_id" value="' . esc_attr($client_id) . '">';
-}
-
-// Render client secret field
-function reddit_crosspost_client_secret_render() {
-    $client_secret = get_option('reddit_crosspost_client_secret');
-    echo '<input type="text" name="reddit_crosspost_client_secret" value="' . esc_attr($client_secret) . '">';
-}
-
-// Render category to subreddit mapping field
-function reddit_crosspost_mapping_render() {
-    $mapping = get_option('reddit_crosspost_category_subreddit_mapping');
-    echo '<textarea name="reddit_crosspost_category_subreddit_mapping" rows="6" cols="50">' . esc_textarea($mapping) . '</textarea>';
-    echo '<p>Enter one category to subreddit mapping per line in the format: category: subreddit1,subreddit2</p>';
-}
-
-// Render settings page
-function reddit_crosspost_options_page() {
     ?>
-    <form action="options.php" method="post">
-        <h1>Reddit Cross-Post Plugin</h1>
-        <?php
-        settings_fields('reddit_crosspost_settings');
-        do_settings_sections('reddit-crosspost-settings');
-        submit_button();
-        ?>
-        <button type="button" onclick="window.location.href='<?php echo reddit_crosspost_get_authorization_url(); ?>'">Authorize with Reddit</button>
-    </form>
+    <div class="wrap">
+        <h1>Reddit Cross Poster Settings</h1>
+        <form method="post" action="options.php">
+            <?php
+            settings_fields('reddit_cross_poster_options');
+            do_settings_sections('reddit-cross-poster');
+            submit_button();
+            ?>
+        </form>
+        <h2>OAuth Authentication</h2>
+        <a href="<?php echo esc_url(add_query_arg('reddit_oauth', '1')); ?>" class="button button-primary">Authenticate with Reddit</a>
+        <p><?php echo esc_html(get_option('reddit_access_token') ? 'Logged in' : 'Not logged in'); ?></p>
+    </div>
     <?php
 }
 
-// Generate Reddit OAuth authorization URL
-function reddit_crosspost_get_authorization_url() {
-    $client_id = get_option('reddit_crosspost_client_id');
-    $redirect_uri = urlencode(admin_url('options-general.php?page=reddit-crosspost-settings&action=oauth_callback'));
+// Start OAuth process with fixed redirect URI
+function reddit_cross_poster_start_oauth() {
+    $client_id = get_option('reddit_client_id');
+    $state = wp_generate_uuid4(); // Generate a random state
 
-    $state = wp_create_nonce('reddit_crosspost_oauth');
-    $scopes = 'submit identity';
-    $authorization_url = "https://www.reddit.com/api/v1/authorize?client_id={$client_id}&response_type=code&state={$state}&redirect_uri={$redirect_uri}&duration=permanent&scope={$scopes}";
+    $oauth_url = "https://www.reddit.com/api/v1/authorize?client_id={$client_id}&response_type=code&state={$state}&redirect_uri=" . urlencode(REDDIT_REDIRECT_URI) . "&duration=permanent&scope=submit";
 
-    return $authorization_url;
+    // Redirect to Reddit for OAuth
+    wp_redirect($oauth_url);
+    exit;
 }
 
-// Meta box for Reddit Cross-Post
-function reddit_crosspost_add_meta_box() {
-    add_meta_box('reddit_crosspost_section', 'Reddit Cross-Post Options', 'reddit_crosspost_meta_box_callback', 'post', 'side');
+// Handle OAuth response and store the access token
+function reddit_cross_poster_handle_oauth_response($code) {
+    $client_id = get_option('reddit_client_id');
+    $client_secret = get_option('reddit_client_secret');
+
+    $url = 'https://www.reddit.com/api/v1/access_token';
+
+    $response = wp_remote_post($url, array(
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode($client_id . ':' . $client_secret),
+            'User-Agent' => 'YourAppName/0.1 by YourUsername'
+        ),
+        'body' => array(
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => REDDIT_REDIRECT_URI
+        )
+    ));
+
+    if (is_wp_error($response)) {
+        error_log("Reddit Cross Poster: " . $response->get_error_message());
+        return;
+    }
+
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    if (isset($body['access_token'])) {
+        // Store the access token
+        update_option('reddit_access_token', $body['access_token']);
+        update_option('reddit_refresh_token', $body['refresh_token']);
+        error_log("Reddit Cross Poster: Successfully retrieved access token.");
+    } else {
+        error_log("Reddit Cross Poster: Failed to retrieve access token - Response: " . print_r($body, true));
+    }
 }
 
-// Render meta box with button for manual cross-posting
-function reddit_crosspost_meta_box_callback($post) {
-    $value = get_post_meta($post->ID, '_reddit_crosspost', true);
-    $subreddit = get_post_meta($post->ID, '_reddit_crosspost_subreddit', true);
-    wp_nonce_field('reddit_crosspost_meta_box', 'reddit_crosspost_meta_box_nonce');
+// Register plugin settings
+add_action('admin_init', 'reddit_cross_poster_settings');
+function reddit_cross_poster_settings() {
+    register_setting('reddit_cross_poster_options', 'reddit_client_id');
+    register_setting('reddit_cross_poster_options', 'reddit_client_secret');
+    register_setting('reddit_cross_poster_options', 'reddit_category_subreddit_map');
+
+    add_settings_section('reddit_cross_poster_main', 'Reddit API Settings', null, 'reddit-cross-poster');
+    
+    add_settings_field('reddit_client_id', 'Client ID', 'reddit_client_id_callback', 'reddit-cross-poster', 'reddit_cross_poster_main');
+    add_settings_field('reddit_client_secret', 'Client Secret', 'reddit_client_secret_callback', 'reddit-cross-poster', 'reddit_cross_poster_main');
+    add_settings_field('reddit_category_subreddit_map', 'Category to Subreddit Mapping', 'reddit_category_subreddit_map_callback', 'reddit-cross-poster', 'reddit_cross_poster_main');
+}
+
+function reddit_client_id_callback() {
+    echo '<input type="text" name="reddit_client_id" value="' . esc_attr(get_option('reddit_client_id')) . '" />';
+}
+
+function reddit_client_secret_callback() {
+    echo '<input type="text" name="reddit_client_secret" value="' . esc_attr(get_option('reddit_client_secret')) . '" />';
+}
+
+function reddit_category_subreddit_map_callback() {
+    echo '<textarea name="reddit_category_subreddit_map" rows="5" cols="50">' . esc_textarea(get_option('reddit_category_subreddit_map')) . '</textarea>';
+    echo '<p>Enter in the format: category:subreddit1,subreddit2</p>';
+}
+
+// Add meta box in post editor
+add_action('add_meta_boxes', 'reddit_cross_poster_meta_box');
+function reddit_cross_poster_meta_box() {
+    add_meta_box('reddit_cross_poster_meta', 'Reddit Cross Poster', 'reddit_cross_poster_meta_callback', 'post', 'side');
+}
+
+function reddit_cross_poster_meta_callback($post) {
+    $value = get_post_meta($post->ID, '_reddit_cross_post_manual_subreddit', true);
+    $enabled = get_post_meta($post->ID, '_reddit_cross_post_enabled', true);
     ?>
-    <p>
-        <label for="reddit_crosspost_toggle">Cross-Post to Reddit?</label>
-        <select name="reddit_crosspost_toggle" id="reddit_crosspost_toggle">
-            <option value="no" <?php selected($value, 'no'); ?>>No</option>
-            <option value="yes" <?php selected($value, 'yes'); ?>>Yes</option>
-        </select>
-    </p>
-    <p>
-        <label for="reddit_crosspost_subreddit">Subreddit (comma-separated):</label>
-        <input type="text" name="reddit_crosspost_subreddit" id="reddit_crosspost_subreddit" value="<?php echo esc_attr($subreddit); ?>" />
-    </p>
-    <p>
-        <button id="reddit_crosspost_manual_button" data-post-id="<?php echo $post->ID; ?>" class="button button-primary">Post to Reddit Now</button>
-    </p>
-    <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            $('#reddit_crosspost_manual_button').click(function(e) {
-                e.preventDefault();
-                var post_id = $(this).data('post-id');
-                var data = {
-                    'action': 'reddit_crosspost_manual',
-                    'post_id': post_id,
-                    'nonce': '<?php echo wp_create_nonce("reddit_crosspost_manual_nonce"); ?>'
-                };
-
-                $.post(ajaxurl, data, function(response) {
-                    alert(response.data ? response.data : response);
-                });
-            });
+    <label for="reddit_cross_post_enabled">
+        <input type="checkbox" name="reddit_cross_post_enabled" id="reddit_cross_post_enabled" value="1" <?php checked($enabled, '1'); ?>>
+        Enable Auto-Post to Reddit
+    </label>
+    <br><br>
+    <label for="reddit_cross_post_manual_subreddit">Manual Subreddit:</label>
+    <input type="text" name="reddit_cross_post_manual_subreddit" id="reddit_cross_post_manual_subreddit" value="<?php echo esc_attr($value); ?>" />
+    <br><br>
+    <button type="button" id="reddit_cross_poster_send_now" class="button button-primary">Send Now</button>
+    <script>
+        document.getElementById('reddit_cross_poster_send_now').addEventListener('click', function() {
+            document.getElementById('publish').click(); // Trigger WordPress save and send process
         });
     </script>
     <?php
 }
 
-// Save post data when the post is saved
-function reddit_crosspost_save_postdata($post_id) {
-    if (!isset($_POST['reddit_crosspost_meta_box_nonce']) || !wp_verify_nonce($_POST['reddit_crosspost_meta_box_nonce'], 'reddit_crosspost_meta_box')) {
-        return;
+// Save meta box data
+add_action('save_post', 'reddit_cross_poster_save_postdata');
+function reddit_cross_poster_save_postdata($post_id) {
+    if (array_key_exists('reddit_cross_post_manual_subreddit', $_POST)) {
+        update_post_meta($post_id, '_reddit_cross_post_manual_subreddit', sanitize_text_field($_POST['reddit_cross_post_manual_subreddit']));
     }
-
-    if (isset($_POST['reddit_crosspost_toggle'])) {
-        update_post_meta($post_id, '_reddit_crosspost', sanitize_text_field($_POST['reddit_crosspost_toggle']));
-    }
-
-    if (isset($_POST['reddit_crosspost_subreddit'])) {
-        update_post_meta($post_id, '_reddit_crosspost_subreddit', sanitize_text_field($_POST['reddit_crosspost_subreddit']));
-    }
-
-    if ($_POST['reddit_crosspost_toggle'] === 'yes') {
-        reddit_crosspost_to_reddit($post_id);
-    }
+    $enabled = isset($_POST['reddit_cross_post_enabled']) ? '1' : '';
+    update_post_meta($post_id, '_reddit_cross_post_enabled', $enabled);
 }
 
-// Handle AJAX request for manual cross-posting
-function reddit_crosspost_manual_post() {
-    check_ajax_referer('reddit_crosspost_manual_nonce', 'nonce');
-    if (!current_user_can('edit_posts')) {
-        wp_send_json_error('You do not have permission to perform this action.');
+// Post to Reddit on post publish
+add_action('publish_post', 'reddit_cross_poster_publish_to_reddit');
+function reddit_cross_poster_publish_to_reddit($post_id) {
+    error_log("Reddit Cross Poster: Attempting to publish post ID $post_id"); // Debugging log
+
+    $client_id = get_option('reddit_client_id');
+    $client_secret = get_option('reddit_client_secret');
+    $manual_subreddit = get_post_meta($post_id, '_reddit_cross_post_manual_subreddit', true);
+    $enabled = get_post_meta($post_id, '_reddit_cross_post_enabled', true);
+    $category_subreddit_map = get_option('reddit_category_subreddit_map');
+    $token = get_option('reddit_access_token');
+
+    if (!$token) {
+        error_log("Reddit Cross Poster: No access token found for post ID $post_id");
+        return; // Exit if no access token is available
     }
 
-    $post_id = intval($_POST['post_id']);
-    $subreddit = get_post_meta($post_id, '_reddit_crosspost_subreddit', true);
-    
-    // Directly cross-post to the specified subreddit without category mappings
-    $result = reddit_crosspost_to_reddit($post_id, $subreddit);
-
-    if (strpos($result, 'Success') !== false) {
-        wp_send_json_success('Post successfully cross-posted to Reddit!');
-    } else {
-        wp_send_json_error($result);
-    }
-}
-
-// Cross-post to Reddit
-function reddit_crosspost_to_reddit($post_id, $subreddit = null) {
-    $client_id = get_option('reddit_crosspost_client_id');
-    $client_secret = get_option('reddit_crosspost_client_secret');
-    $access_token = get_option('reddit_crosspost_access_token');
-    $post = get_post($post_id);
-    $title = html_entity_decode(get_the_title($post_id), ENT_QUOTES, 'UTF-8');
-    $url = get_permalink($post_id);
-    $excerpt = html_entity_decode(get_the_excerpt($post_id), ENT_QUOTES, 'UTF-8'); // Get excerpt
-
-    // Get category to subreddit mappings
-    $category_mapping = get_option('reddit_crosspost_category_subreddit_mapping');
-    $mappings = explode("\n", $category_mapping);
-    $categories = [];
-
-    foreach ($mappings as $mapping) {
-        if (strpos($mapping, ':') !== false) {
-            list($category, $subreddits) = explode(':', trim($mapping));
-            $categories[trim($category)] = array_map('trim', explode(',', $subreddits));
-        }
+    if (!$enabled && empty($manual_subreddit)) {
+        error_log("Reddit Cross Poster: Auto-posting is disabled and no manual subreddit provided for post ID $post_id");
+        return; // Exit if auto-posting is disabled and no manual subreddit is set
     }
 
-    // Get post categories
-    $post_categories = get_the_category($post_id);
-    $subreddits_to_post = [];
+    // Retrieve post categories
+    $categories = wp_get_post_categories($post_id, array('fields' => 'names'));
+    error_log("Reddit Cross Poster: Categories for post ID $post_id - " . implode(', ', $categories)); // Log categories
 
-    // Check category mappings if a subreddit is not provided
-    if (empty($subreddit)) {
-        foreach ($post_categories as $category) {
-            if (isset($categories[$category->name])) {
-                $subreddits_to_post = array_merge($subreddits_to_post, $categories[$category->name]);
+    $target_subreddits = array();
+
+    // Safely handle category to subreddit mapping
+    if (!empty($category_subreddit_map)) {
+        foreach (explode("\n", $category_subreddit_map) as $mapping) {
+            if (strpos($mapping, ':') !== false) { // Ensure the mapping has a colon
+                list($category, $subreddits) = explode(':', trim($mapping));
+                $subreddits = array_map('trim', explode(',', $subreddits));
+                if (in_array($category, $categories)) {
+                    $target_subreddits = array_merge($target_subreddits, $subreddits);
+                }
             }
         }
-        if (empty($subreddits_to_post)) {
-            return 'Error: No subreddit available for this category.';
-        }
-        $subreddit = implode(',', $subreddits_to_post); // Use first available subreddit
     }
 
-    // Prepare the post data
-    $response = wp_remote_post('https://oauth.reddit.com/api/submit', array(
+    if (!empty($manual_subreddit)) {
+        $target_subreddits[] = $manual_subreddit;
+    }
+
+    // Post to each matched subreddit
+    if (!empty($target_subreddits)) {
+        $title = get_the_title($post_id);
+        $url = get_permalink($post_id);
+        $excerpt = wp_trim_words(get_the_excerpt($post_id), 55);
+        $image = ''; // Set this to the URL of your featured image if applicable
+
+        foreach ($target_subreddits as $subreddit) {
+            $success = reddit_cross_poster_submit_to_reddit($token, $title, $url, $excerpt, $image, $subreddit);
+            if (!$success) {
+                error_log("Reddit Cross Poster: Failed to post to r/$subreddit for post ID $post_id");
+            }
+        }
+    } else {
+        error_log("Reddit Cross Poster: No target subreddits found for post ID $post_id");
+    }
+}
+
+// Get access token from Reddit
+function reddit_cross_poster_get_access_token($client_id, $client_secret) {
+    $url = 'https://www.reddit.com/api/v1/access_token';
+
+    $response = wp_remote_post($url, array(
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode($client_id . ':' . $client_secret),
+            'User-Agent' => 'YourAppName/0.1 by YourUsername'
+        ),
+        'body' => array(
+            'grant_type' => 'client_credentials'
+        )
+    ));
+
+    if (is_wp_error($response)) {
+        error_log("Reddit Cross Poster: " . $response->get_error_message());
+        return false;
+    }
+
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    if (isset($body['access_token'])) {
+        return $body['access_token'];
+    } else {
+        error_log("Reddit Cross Poster: Failed to retrieve access token - Response: " . print_r($body, true));
+        return false;
+    }
+}
+
+// Submit the post to Reddit
+function reddit_cross_poster_submit_to_reddit($token, $title, $url, $excerpt, $image, $subreddit) {
+    $post_url = 'https://oauth.reddit.com/api/submit';
+
+    $response = wp_remote_post($post_url, array(
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $token,
+            'User-Agent' => 'YourAppName/0.1 by YourUsername'
+        ),
         'body' => array(
             'title' => $title,
             'url' => $url,
             'sr' => $subreddit,
-            'kind' => 'link',
-            'resubmit' => true,
-            'text' => $excerpt, // Include the excerpt
-        ),
-        'headers' => array(
-            'Authorization' => 'Bearer ' . $access_token,
-            'User-Agent' => 'WordPressRedditCrossPost/1.0',
-        ),
+            'kind' => 'link', // 'self' if self-post
+            'text' => $excerpt,
+        )
     ));
 
     if (is_wp_error($response)) {
-        return 'Error posting to Reddit: ' . $response->get_error_message();
+        error_log("Reddit Cross Poster: " . $response->get_error_message());
+        return false;
     }
 
-    $response_body = json_decode(wp_remote_retrieve_body($response), true);
-
-    if (isset($response_body['error'])) {
-        return 'Reddit Error: ' . $response_body['error'];
-    }
-
-    return 'Success! Post shared on Reddit.';
-}
-
-// Handle OAuth callback
-function reddit_crosspost_handle_oauth_callback() {
-    if (!isset($_GET['state']) || !wp_verify_nonce($_GET['state'], 'reddit_crosspost_oauth')) {
-        wp_die('Invalid OAuth state.');
-    }
-
-    if (isset($_GET['code'])) {
-        $client_id = get_option('reddit_crosspost_client_id');
-        $client_secret = get_option('reddit_crosspost_client_secret');
-        $redirect_uri = admin_url('options-general.php?page=reddit-crosspost-settings&action=oauth_callback');
-        $code = sanitize_text_field($_GET['code']);
-
-        $token_url = 'https://www.reddit.com/api/v1/access_token';
-
-        $response = wp_remote_post($token_url, array(
-            'body' => array(
-                'grant_type' => 'authorization_code',
-                'code' => $code,
-                'redirect_uri' => $redirect_uri,
-            ),
-            'headers' => array(
-                'Authorization' => 'Basic ' . base64_encode("$client_id:$client_secret"),
-                'Content-Type' => 'application/x-www-form-urlencoded',
-            )
-        ));
-
-        if (is_wp_error($response)) {
-            wp_die('Error retrieving access token: ' . $response->get_error_message());
-        }
-
-        $response_body = json_decode(wp_remote_retrieve_body($response), true);
-
-        if (isset($response_body['access_token'])) {
-            update_option('reddit_crosspost_access_token', $response_body['access_token']);
-            update_option('reddit_crosspost_refresh_token', $response_body['refresh_token']);
-            wp_redirect(admin_url('options-general.php?page=reddit-crosspost-settings&oauth_success=1'));
-            exit;
-        } else {
-            wp_die('Error in OAuth process: ' . print_r($response_body, true));
-        }
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    if (isset($body['json']['data']['url'])) {
+        error_log("Reddit Cross Poster: Successfully posted to r/$subreddit");
+        return true;
+    } else {
+        error_log("Reddit Cross Poster: Failed to post to r/$subreddit - Response: " . print_r($body, true));
+        return false;
     }
 }
-
-// Handle OAuth callback action
-if (isset($_GET['action']) && $_GET['action'] === 'oauth_callback') {
-    add_action('init', 'reddit_crosspost_handle_oauth_callback');
-}
-?>
