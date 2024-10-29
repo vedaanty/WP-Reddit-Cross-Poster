@@ -12,8 +12,14 @@ Author URI: https://vestrainteractive.com
 
 Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
 
+---
 
-To use:
+## To use:
+
+Open the file reddit-crosspost-plugin.php in a text editor and edit line 12:
+
+`code`define('REDDIT_REDIRECT_URI', 'https://interstate411.us/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL
+
 
 Upload and activate plugin.
 
