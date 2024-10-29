@@ -16,9 +16,9 @@ Cross-posts WordPress posts to specified subreddits based on category or custom 
 
 ## To use:
 
-Open the file reddit-crosspost-plugin.php in a text editor and edit line 12:
+Open the file reddit-crosspost-plugin.php in a text editor and edit line 12 with your domain:
 
-`code`define('REDDIT_REDIRECT_URI', 'https://interstate411.us/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL
+`define('REDDIT_REDIRECT_URI', 'https://interstate411.us/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL`
 
 
 Upload and activate plugin.
