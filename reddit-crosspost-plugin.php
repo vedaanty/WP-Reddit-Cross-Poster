@@ -1,15 +1,17 @@
 <?php
 /*
 Plugin Name: Reddit Cross-Post Plugin
-Plugin URI: https://github.com/vestrainteractive/reddit-crosspost-plugin
+Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-Version: 1.0.9
-Author: Vestra Interactive
-Author URI: https://vestrainteractive.com
+Version: 1.0.0
+Author: Vedaant Y
+Author URI: https://github.com/vedaanty/
 */
+// Supress output to remove unintended whitespace
+ob_start();
 
-// Define a fixed redirect URI as a constant
-define('REDDIT_REDIRECT_URI', 'https://domain.com/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL
+// Define the redirect URI as a constant
+define('REDDIT_REDIRECT_URI', admin_url('admin.php?page=reddit-cross-poster'));
 
 // Add the admin menu for plugin settings
 add_action('admin_menu', 'reddit_cross_poster_menu');
