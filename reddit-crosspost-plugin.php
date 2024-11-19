@@ -3,8 +3,8 @@
 Plugin Name: Reddit Cross-Post Plugin
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-Version: 1.0.0
-Author: Vedaant Y
+Version: 1.0.1
+Author: Vedaant
 Author URI: https://github.com/vedaanty/
 */
 // Supress output to remove unintended whitespace
@@ -161,35 +161,39 @@ function reddit_cross_poster_save_postdata($post_id) {
 // Post to Reddit on post publish
 add_action('publish_post', 'reddit_cross_poster_publish_to_reddit');
 function reddit_cross_poster_publish_to_reddit($post_id) {
-    error_log("Reddit Cross Poster: Attempting to publish post ID $post_id"); // Debugging log
-
-    $client_id = get_option('reddit_client_id');
-    $client_secret = get_option('reddit_client_secret');
     $manual_subreddit = get_post_meta($post_id, '_reddit_cross_post_manual_subreddit', true);
     $enabled = get_post_meta($post_id, '_reddit_cross_post_enabled', true);
     $category_subreddit_map = get_option('reddit_category_subreddit_map');
     $token = get_option('reddit_access_token');
 
     if (!$token) {
-        error_log("Reddit Cross Poster: No access token found for post ID $post_id");
-        return; // Exit if no access token is available
+        error_log("Reddit Cross Poster: No OAuth token available.");
+        return;
     }
 
     if (!$enabled && empty($manual_subreddit)) {
-        error_log("Reddit Cross Poster: Auto-posting is disabled and no manual subreddit provided for post ID $post_id");
-        return; // Exit if auto-posting is disabled and no manual subreddit is set
+        error_log("Reddit Cross Poster: Auto-posting is disabled and no manual subreddit provided.");
+        return;
     }
 
-    // Retrieve post categories
-    $categories = wp_get_post_categories($post_id, array('fields' => 'names'));
-    error_log("Reddit Cross Poster: Categories for post ID $post_id - " . implode(', ', $categories)); // Log categories
+    // Retrieve the featured image URL
+    $image_url = has_post_thumbnail($post_id) ? get_the_post_thumbnail_url($post_id, 'full') : '';
+    if (!$image_url) {
+        error_log("Reddit Cross Poster: No featured image found for post ID $post_id.");
+        return;
+    }
 
+    // Get the excerpt
+    $excerpt = wp_trim_words(get_the_excerpt($post_id), 55);
+    $post_url = get_permalink($post_id);
+
+    // Determine target subreddits
+    $categories = wp_get_post_categories($post_id, array('fields' => 'names'));
     $target_subreddits = array();
 
-    // Safely handle category to subreddit mapping
     if (!empty($category_subreddit_map)) {
         foreach (explode("\n", $category_subreddit_map) as $mapping) {
-            if (strpos($mapping, ':') !== false) { // Ensure the mapping has a colon
+            if (strpos($mapping, ':') !== false) {
                 list($category, $subreddits) = explode(':', trim($mapping));
                 $subreddits = array_map('trim', explode(',', $subreddits));
                 if (in_array($category, $categories)) {
@@ -203,23 +207,25 @@ function reddit_cross_poster_publish_to_reddit($post_id) {
         $target_subreddits[] = $manual_subreddit;
     }
 
-    // Post to each matched subreddit
-    if (!empty($target_subreddits)) {
-        $title = get_the_title($post_id);
-        $url = get_permalink($post_id);
-        $excerpt = wp_trim_words(get_the_excerpt($post_id), 55);
-        $image = ''; // Set this to the URL of your featured image if applicable
+    // Submit the image with the excerpt to each matched subreddit
+    $title = get_the_title($post_id);
+    foreach ($target_subreddits as $subreddit) {
+        $success = reddit_cross_poster_submit_to_reddit(
+            $token,
+            $title,
+            $image_url,
+            $excerpt,
+            $post_url,
+            $subreddit
+        );
 
-        foreach ($target_subreddits as $subreddit) {
-            $success = reddit_cross_poster_submit_to_reddit($token, $title, $url, $excerpt, $image, $subreddit);
-            if (!$success) {
-                error_log("Reddit Cross Poster: Failed to post to r/$subreddit for post ID $post_id");
-            }
+        if (!$success) {
+            error_log("Reddit Cross Poster: Failed to post image with excerpt to r/$subreddit for post ID $post_id.");
         }
-    } else {
-        error_log("Reddit Cross Poster: No target subreddits found for post ID $post_id");
     }
 }
+
+
 
 // Get access token from Reddit
 function reddit_cross_poster_get_access_token($client_id, $client_secret) {
@@ -250,34 +256,50 @@ function reddit_cross_poster_get_access_token($client_id, $client_secret) {
 }
 
 // Submit the post to Reddit
-function reddit_cross_poster_submit_to_reddit($token, $title, $url, $excerpt, $image, $subreddit) {
+function reddit_cross_poster_submit_to_reddit($token, $title, $image_url, $excerpt, $post_url, $subreddit) {
     $post_url = 'https://oauth.reddit.com/api/submit';
 
+    // Ensure we have a valid image URL
+    if (!$image_url) {
+        error_log("Reddit Cross Poster: No image URL provided for subreddit: $subreddit");
+        return false;
+    }
+
+    // Construct the combined text for the post
+    $combined_text = $excerpt . " [Continue reading on our website]($post_url)";
+
+    // Prepare the request data
+    $post_data = array(
+        'title' => $title,        // Title of the post
+        'url' => $image_url,      // URL of the image to submit
+        'kind' => 'link',         // Submit as a link post
+        'sr' => $subreddit,       // Subreddit name
+        'text' => $combined_text, // Add excerpt and "Read more" link
+    );
+
+    // Make the API request to Reddit
     $response = wp_remote_post($post_url, array(
         'headers' => array(
             'Authorization' => 'Bearer ' . $token,
-            'User-Agent' => 'YourAppName/0.1 by YourUsername'
+            'User-Agent' => 'YourAppName/1.0'
         ),
-        'body' => array(
-            'title' => $title,
-            'url' => $url,
-            'sr' => $subreddit,
-            'kind' => 'link', // 'self' if self-post
-            'text' => $excerpt,
-        )
+        'body' => $post_data,
     ));
 
+    // Handle the API response
     if (is_wp_error($response)) {
-        error_log("Reddit Cross Poster: " . $response->get_error_message());
+        error_log("Reddit Cross Poster: WP Error - " . $response->get_error_message());
         return false;
     }
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
+
     if (isset($body['json']['data']['url'])) {
-        error_log("Reddit Cross Poster: Successfully posted to r/$subreddit");
+        error_log("Reddit Cross Poster: Successfully posted image with excerpt to r/$subreddit - URL: " . $body['json']['data']['url']);
         return true;
     } else {
         error_log("Reddit Cross Poster: Failed to post to r/$subreddit - Response: " . print_r($body, true));
         return false;
     }
 }
+
