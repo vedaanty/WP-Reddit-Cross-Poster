@@ -3,7 +3,7 @@
 Plugin Name: Reddit Cross-Post Plugin
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-Version: 1.1.2
+Version: 1.1.3
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
 */
@@ -96,6 +96,33 @@ function reddit_cross_poster_settings() {
     add_settings_field('reddit_category_subreddit_map', 'Category to Subreddit Mapping', 'reddit_category_subreddit_map_callback', 'reddit-cross-poster', 'reddit_cross_poster_main');
 }
 
+// Ensure data deletion on plugin removal:
+// Register the uninstall hook
+register_uninstall_hook(__FILE__, 'reddit_cross_poster_uninstall');
+
+// Uninstall function to clean up plugin data
+function reddit_cross_poster_uninstall() {
+    // Delete plugin options
+    delete_option('reddit_client_id');
+    delete_option('reddit_client_secret');
+    delete_option('reddit_access_token');
+    delete_option('reddit_refresh_token');
+    delete_option('reddit_category_subreddit_map');
+
+    // Delete all user meta related to the plugin
+    global $wpdb;
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$wpdb->usermeta} WHERE meta_key IN (%s, %s)",
+            '_reddit_cross_post_enabled',
+            '_reddit_cross_post_manual_subreddit'
+        )
+    );
+
+    // Log uninstall event (useful for debugging)
+    error_log('Reddit Cross Poster plugin uninstalled and data cleaned up.');
+}
+
 function reddit_client_id_callback() {
     echo '<input type="text" name="reddit_client_id" value="' . esc_attr(get_option('reddit_client_id')) . '" />';
 }
@@ -113,13 +140,15 @@ function reddit_category_subreddit_map_callback() {
 add_action('add_meta_boxes', 'reddit_cross_poster_meta_box');
 function reddit_cross_poster_meta_box() {
     add_meta_box(
-        'reddit_cross_poster_meta',
-        'Reddit Cross Poster',
-        'reddit_cross_poster_meta_callback',
-        'post', // Restrict to posts
-        'side' // Places it in the sidebar
+        'reddit_cross_poster_meta', // Meta box ID
+        'Reddit Cross Poster', // Title of the meta box
+        'reddit_cross_poster_meta_callback', // Callback function to render the meta box
+        'post', // Post type
+        'side', // Location of the meta box
+        'default' // Priority
     );
 }
+
 
 function reddit_cross_poster_meta_callback($post) {
     // Retrieve existing meta data
@@ -170,34 +199,6 @@ function reddit_cross_poster_meta_callback($post) {
         });
     </script>
     <?php
-}
-
-// force metabox visibility
-add_filter('default_hidden_meta_boxes', 'reddit_cross_poster_force_meta_box_visibility', 10, 2);
-function reddit_cross_poster_force_meta_box_visibility($hidden, $screen) {
-    if ($screen->id == 'post') {
-        // Remove the Reddit Cross Poster meta box from the hidden array
-        $key = array_search('reddit_cross_poster_meta', $hidden);
-        if ($key !== false) {
-            unset($hidden[$key]);
-        }
-    }
-    return $hidden;
-}
-
-add_action('admin_footer', 'reddit_cross_poster_disable_screen_option');
-function reddit_cross_poster_disable_screen_option() {
-    $screen = get_current_screen();
-    if ($screen->id == 'post') {
-        ?>
-        <script>
-            jQuery(document).ready(function($) {
-                // Disable the checkbox for Reddit Cross Poster in Screen Options
-                $('#screen-options-wrap input[value="reddit_cross_poster_meta"]').attr('disabled', true);
-            });
-        </script>
-        <?php
-    }
 }
 
 // AJAX handler for the "Send Now" button
