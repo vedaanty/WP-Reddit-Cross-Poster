@@ -3,7 +3,7 @@
 Plugin Name: Reddit Cross-Post Plugin
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-Version: 1.1.0
+Version: 1.1.2
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
 */
@@ -112,20 +112,46 @@ function reddit_category_subreddit_map_callback() {
 // Add meta box for post editor
 add_action('add_meta_boxes', 'reddit_cross_poster_meta_box');
 function reddit_cross_poster_meta_box() {
-    add_meta_box('reddit_cross_poster_meta', 'Reddit Cross Poster', 'reddit_cross_poster_meta_callback', 'post', 'side');
+    add_meta_box(
+        'reddit_cross_poster_meta',
+        'Reddit Cross Poster',
+        'reddit_cross_poster_meta_callback',
+        'post', // Restrict to posts
+        'side' // Places it in the sidebar
+    );
 }
 
 function reddit_cross_poster_meta_callback($post) {
+    // Retrieve existing meta data
+    $enabled = get_post_meta($post->ID, '_reddit_cross_post_enabled', true);
+    $manual_subreddit = get_post_meta($post->ID, '_reddit_cross_post_manual_subreddit', true);
     ?>
-    <label for="reddit_cross_post_enabled">
-        <input type="checkbox" name="reddit_cross_post_enabled" id="reddit_cross_post_enabled" value="1" <?php checked(get_post_meta($post->ID, '_reddit_cross_post_enabled', true), '1'); ?>>
-        Enable Auto-Post to Reddit
-    </label>
-    <br><br>
-    <label for="reddit_cross_post_manual_subreddit">Manual Subreddit:</label>
-    <input type="text" name="reddit_cross_post_manual_subreddit" id="reddit_cross_post_manual_subreddit" value="<?php echo esc_attr(get_post_meta($post->ID, '_reddit_cross_post_manual_subreddit', true)); ?>" />
-    <br><br>
-    <button type="button" id="reddit_cross_poster_send_now" class="button button-primary">Send Now</button>
+    <div style="margin-bottom: 10px;">
+        <label for="reddit_cross_post_enabled">
+            <input type="checkbox" name="reddit_cross_post_enabled" id="reddit_cross_post_enabled" value="1" <?php checked($enabled, '1'); ?>>
+            <strong>Auto Cross-Post</strong>
+        </label>
+        <p style="margin: 5px 0 0; font-size: 12px; color: #555;">
+            When enabled, this post will be submitted to Reddit automatically upon saving or publishing using the categories defined in the settings.
+        </p>
+    </div>
+
+    <div style="margin-bottom: 10px;">
+        <label for="reddit_cross_post_manual_subreddit">
+            <strong>Override and Post Manually:</strong>
+        </label>
+        <input type="text" name="reddit_cross_post_manual_subreddit" id="reddit_cross_post_manual_subreddit" value="<?php echo esc_attr($manual_subreddit); ?>" placeholder="e.g., pics" style="width: 100%;">
+        <p style="margin: 5px 0 0; font-size: 12px; color: #555;">
+            Specify the subreddit where this post should be submitted. Separate multiple subreddits with commas.
+        </p>
+    </div>
+
+    <div style="margin-bottom: 10px;">
+        <button type="button" id="reddit_cross_poster_send_now" class="button button-primary">
+            Manual Submit Now
+        </button>
+    </div>
+
     <script>
         document.getElementById('reddit_cross_poster_send_now').addEventListener('click', function() {
             const postId = <?php echo $post->ID; ?>;
@@ -135,11 +161,43 @@ function reddit_cross_poster_meta_callback($post) {
                 _ajax_nonce: '<?php echo wp_create_nonce("reddit_cross_post_nonce"); ?>'
             };
             jQuery.post(ajaxurl, data, function(response) {
-                alert(response.success ? 'Post successfully submitted to Reddit!' : 'Failed to submit post: ' + response.data);
+                if (response.success) {
+                    alert('Post successfully submitted to Reddit!');
+                } else {
+                    alert('Failed to submit post: ' + response.data);
+                }
             });
         });
     </script>
     <?php
+}
+
+// force metabox visibility
+add_filter('default_hidden_meta_boxes', 'reddit_cross_poster_force_meta_box_visibility', 10, 2);
+function reddit_cross_poster_force_meta_box_visibility($hidden, $screen) {
+    if ($screen->id == 'post') {
+        // Remove the Reddit Cross Poster meta box from the hidden array
+        $key = array_search('reddit_cross_poster_meta', $hidden);
+        if ($key !== false) {
+            unset($hidden[$key]);
+        }
+    }
+    return $hidden;
+}
+
+add_action('admin_footer', 'reddit_cross_poster_disable_screen_option');
+function reddit_cross_poster_disable_screen_option() {
+    $screen = get_current_screen();
+    if ($screen->id == 'post') {
+        ?>
+        <script>
+            jQuery(document).ready(function($) {
+                // Disable the checkbox for Reddit Cross Poster in Screen Options
+                $('#screen-options-wrap input[value="reddit_cross_poster_meta"]').attr('disabled', true);
+            });
+        </script>
+        <?php
+    }
 }
 
 // AJAX handler for the "Send Now" button
@@ -186,6 +244,9 @@ function reddit_cross_poster_ajax_handler() {
 
 // Submit post to Reddit
 function reddit_cross_poster_submit_to_reddit($token, $title, $image_url, $excerpt, $post_url, $subreddit) {
+    // Decode HTML entities in the title
+    $decoded_title = html_entity_decode($title, ENT_QUOTES);
+
     $combined_text = $excerpt . " [Continue reading on our website]($post_url)";
 
     $response = wp_remote_post('https://oauth.reddit.com/api/submit', array(
@@ -194,7 +255,7 @@ function reddit_cross_poster_submit_to_reddit($token, $title, $image_url, $excer
             'User-Agent' => 'YourAppName/1.0'
         ),
         'body' => array(
-            'title' => $title,
+            'title' => $decoded_title, // Use the decoded title
             'url' => $image_url,
             'kind' => 'link',
             'sr' => $subreddit,
@@ -210,10 +271,9 @@ function reddit_cross_poster_submit_to_reddit($token, $title, $image_url, $excer
     $body = json_decode(wp_remote_retrieve_body($response), true);
 
     if (isset($body['json']['errors']) && !empty($body['json']['errors'])) {
-        // Log the error and return the error message
         error_log("Reddit Cross Poster: API Errors - " . print_r($body['json']['errors'], true));
         return implode(', ', array_map(function ($error) {
-            return $error[1]; // Reddit's error structure: [error_code, error_message, field]
+            return $error[1];
         }, $body['json']['errors']));
     }
 
