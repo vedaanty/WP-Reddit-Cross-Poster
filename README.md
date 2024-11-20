@@ -19,7 +19,7 @@ It does this by using the featured image on wordpress as the basis of an image p
 Most of the plugin is extremely self explanatory and the UI is user friendly with tooltips to help out. 
 
 ## Credits
-This plugin has been forked from https://github.com/vestrainteractive/reddit-crosspost-plugin
+This plugin has been forked from https://github.com/vestrainteractive/reddit-crosspost-plugin.
 It is updated and upgraded in the following ways:
 - Much more user friendly UI
 - Dynamic redirect url (no need to hardcode url before install)
@@ -29,5 +29,5 @@ It is updated and upgraded in the following ways:
 
 ## Future Development
 This plugin is used in one of my active projects, so if it ever breaks I'll probably end up fixing it. 
-Not exactly sure what additional features can be added, but I am happy to listen to suggestions and squash bugs if you find them! 
-I'm quite new to making wordpress plugins, so please ignore any wordpress faux pas that may have been made
+Not exactly sure what additional features can be added, but I am happy to listen to suggestions and squash bugs if you find them! <br>
+I'm quite new to making wordpress plugins, so please ignore any wordpress faux pas that may have been made.
