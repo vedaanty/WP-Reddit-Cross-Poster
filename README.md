@@ -1,37 +1,33 @@
-# reddit-crosspost-plugin
+# Wordpress Reddit Cross-Post Plugin
 
-Plugin URI: https://github.com/vestrainteractive/reddit-crosspost-plugin
+This plugin aims to allow easy cross posting of your wordpress blog to reddit. 
+It does this by using the featured image on wordpress as the basis of an image post on reddit with a caption that contains an excerpt and a continue reading button that links to the original wordpress source. 
 
-Description: Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
+## Features 
+- Mapping categories to automatically crosspost to multiple subreddits
+- OAuth support for reddit account
+- Manually posting from wordpress
 
-Version: 1.0.9
+## How to use
+- Download the latest release and upload as plugin on wordpress
+- Create a reddit application at: https://www.reddit.com/prefs/apps/
+- Copy the redirect URI from the Reddit Cross Poster tab in your Wordpress dashboard and insert it into the Reddit developer application
+- Paste the client ID and client secret from the Reddit developer application to the Wordpress dashboard
+- Set the default subreddit or map required categories
+- Post a new blog with the Auto Cross Post box checked in the sidebar to automatically post to Reddit
 
-Author: Vestra Interactive
+Most of the plugin is extremely self explanatory and the UI is user friendly with tooltips to help out. 
 
-Author URI: https://vestrainteractive.com
+## Credits
+This plugin has been forked from https://github.com/vestrainteractive/reddit-crosspost-plugin
+It is updated and upgraded in the following ways:
+- Much more user friendly UI
+- Dynamic redirect url (no need to hardcode url before install)
+- Solved issues with posting same thing 2-4 times
+- Fixed OAuth not working in some installations
+- Posts the featured image as an image post instead of just a link
 
-Cross-posts WordPress posts to specified subreddits based on category or custom input. Includes Reddit OAuth authentication, multiple subreddits per category, and error display on the post page.
-
----
-
-## To use:
-
-Open the file reddit-crosspost-plugin.php in a text editor and edit line 12 with your domain:
-
-`define('REDDIT_REDIRECT_URI', 'https://interstate411.us/wp-admin/admin.php?page=reddit-cross-poster'); // Replace with your exact site URL`
-
-
-Upload and activate plugin.
-
-WP Admin > Settings > Reddit Crosspost
-
-Set API information -  Get Reddit API from https://www.reddit.com/prefs/apps/.  
-
-If you want any new posts in certain categories to auto-post to a specific subreddit, enter them in the box below, one per line.  Omit the /r/  For example:
-
-tech:technology
-blog:blogs 
-
-If you want to set the subreddit on a per-post basis, you can do that in the post-editor.
-
-Note:  This plugin will NOT auto-update yet.  It is planned for a future version, however.  Check back in 2025 for this functionality.
+## Future Development
+This plugin is used in one of my active projects, so if it ever breaks I'll probably end up fixing it. 
+Not exactly sure what additional features can be added, but I am happy to listen to suggestions and squash bugs if you find them! 
+I'm quite new to making wordpress plugins, so please ignore any wordpress faux pas that may have been made
