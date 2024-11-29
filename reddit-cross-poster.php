@@ -3,7 +3,7 @@
 Plugin Name: Wordpress Reddit Cross-Poster
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: An plugin for cross-posting WordPress posts to Reddit with dynamic flair support.
-Version: 2.0.0
+Version: 2.0.1
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
 */
@@ -212,37 +212,56 @@ function arcp_add_meta_box() {
 
 // Render meta box
 function arcp_render_meta_box($post) {
+    // Retrieve saved subreddit data
     $subreddit_data = get_post_meta($post->ID, '_arcp_subreddit_data', true) ?: [];
     ?>
     <div id="arcp-meta-box">
         <h4>Manual Submission</h4>
         <div id="arcp-subreddit-container">
-            <?php foreach ($subreddit_data as $entry): ?>
+            <?php if (!empty($subreddit_data)) : ?>
+                <?php foreach ($subreddit_data as $entry): ?>
+                    <div class="arcp-subreddit-row">
+                        <input type="text" name="arcp_subreddits[]" class="arcp-subreddit" placeholder="Subreddit" value="<?php echo esc_attr($entry['subreddit']); ?>" style="width: 40%; margin-right: 5%;">
+                        <select name="arcp_flairs[]" class="arcp-flair" style="width: 40%; margin-right: 5%;">
+                            <option value="<?php echo esc_attr($entry['flair_id']); ?>"><?php echo esc_html($entry['flair_text'] ?? 'No Flair'); ?></option>
+                        </select>
+                        <button type="button" class="arcp-remove-subreddit button button-secondary">Remove</button>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
                 <div class="arcp-subreddit-row">
-                    <input type="text" name="arcp_subreddits[]" class="arcp-subreddit" placeholder="Subreddit" value="<?php echo esc_attr($entry['subreddit']); ?>" style="width: 45%; margin-right: 5%;">
-                    <select name="arcp_flairs[]" class="arcp-flair" style="width: 45%;">
-                        <option value="<?php echo esc_attr($entry['flair_id']); ?>"><?php echo esc_html($entry['flair_text'] ?? 'No Flair'); ?></option>
+                    <input type="text" name="arcp_subreddits[]" class="arcp-subreddit" placeholder="Subreddit" style="width: 40%; margin-right: 5%;">
+                    <select name="arcp_flairs[]" class="arcp-flair" style="width: 40%; margin-right: 5%;">
+                        <option value="">No Flair</option>
                     </select>
+                    <button type="button" class="arcp-remove-subreddit button button-secondary">Remove</button>
                 </div>
-            <?php endforeach; ?>
+            <?php endif; ?>
         </div>
         <button type="button" id="arcp-add-subreddit" class="button">+ Add Subreddit</button>
         <p style="margin-top: 10px;">
             <button type="button" id="arcp-manual-submit" class="button button-primary">Submit to Reddit</button>
         </p>
     </div>
+
     <script>
         jQuery(document).ready(function ($) {
             // Add new subreddit row
             $('#arcp-add-subreddit').on('click', function () {
                 $('#arcp-subreddit-container').append(`
                     <div class="arcp-subreddit-row">
-                        <input type="text" name="arcp_subreddits[]" class="arcp-subreddit" placeholder="Subreddit" style="width: 45%; margin-right: 5%;">
-                        <select name="arcp_flairs[]" class="arcp-flair" style="width: 45%;">
-                            <option value="">Loading...</option>
+                        <input type="text" name="arcp_subreddits[]" class="arcp-subreddit" placeholder="Subreddit" style="width: 40%; margin-right: 5%;">
+                        <select name="arcp_flairs[]" class="arcp-flair" style="width: 40%; margin-right: 5%;">
+                            <option value="">No Flair</option>
                         </select>
+                        <button type="button" class="arcp-remove-subreddit button button-secondary">Remove</button>
                     </div>
                 `);
+            });
+
+            // Remove subreddit row
+            $('#arcp-subreddit-container').on('click', '.arcp-remove-subreddit', function () {
+                $(this).closest('.arcp-subreddit-row').remove();
             });
 
             // Fetch flairs dynamically
@@ -251,7 +270,7 @@ function arcp_render_meta_box($post) {
                 const flairDropdown = $(this).siblings('.arcp-flair');
 
                 if (!subreddit) {
-                    flairDropdown.html('<option value="">No flair available</option>');
+                    flairDropdown.html('<option value="">No Flair</option>');
                     return;
                 }
 
@@ -263,19 +282,19 @@ function arcp_render_meta_box($post) {
                     _ajax_nonce: arcpAjax.nonce
                 }, function (response) {
                     if (response.success) {
-                        flairDropdown.html('<option value="">No flair</option>');
+                        flairDropdown.html('<option value="">No Flair</option>');
                         response.data.forEach(flair => {
                             flairDropdown.append(`<option value="${flair.id}">${flair.text || 'No Flair'}</option>`);
                         });
                     } else {
-                        flairDropdown.html('<option value="">No flair available</option>');
+                        flairDropdown.html('<option value="">No Flair Available</option>');
                     }
                 }).fail(function () {
-                    flairDropdown.html('<option value="">Failed to load</option>');
+                    flairDropdown.html('<option value="">Failed to load flairs</option>');
                 });
             });
 
-            // Manual submit button
+            // Submit to Reddit
             $('#arcp-manual-submit').on('click', function () {
                 const postId = <?php echo $post->ID; ?>;
                 const subredditData = [];
@@ -283,11 +302,13 @@ function arcp_render_meta_box($post) {
                 $('.arcp-subreddit-row').each(function () {
                     const subreddit = $(this).find('.arcp-subreddit').val();
                     const flairId = $(this).find('.arcp-flair').val();
+                    const flairText = $(this).find('.arcp-flair option:selected').text();
 
                     if (subreddit) {
                         subredditData.push({
                             subreddit: subreddit,
-                            flair_id: flairId || null
+                            flair_id: flairId || null,
+                            flair_text: flairText || 'No Flair',
                         });
                     }
                 });
@@ -305,6 +326,14 @@ function arcp_render_meta_box($post) {
                 }, function (response) {
                     if (response.success) {
                         alert('Post successfully submitted:\n' + response.data);
+
+                        // Save subreddit data for persistence
+                        $.post(arcpAjax.ajaxurl, {
+                            action: 'arcp_save_subreddit_data',
+                            post_id: postId,
+                            subreddit_data: JSON.stringify(subredditData),
+                            _ajax_nonce: arcpAjax.nonce
+                        });
                     } else {
                         alert('Failed to submit:\n' + response.data);
                     }
@@ -316,6 +345,24 @@ function arcp_render_meta_box($post) {
     </script>
     <?php
 }
+
+add_action('wp_ajax_arcp_save_subreddit_data', 'arcp_save_subreddit_data_handler');
+function arcp_save_subreddit_data_handler() {
+    check_ajax_referer('arcp_ajax_nonce', '_ajax_nonce');
+
+    $post_id = intval($_POST['post_id']);
+    $subreddit_data_raw = $_POST['subreddit_data'] ?? '';
+
+    if (!$post_id || empty($subreddit_data_raw)) {
+        wp_send_json_error('Invalid post ID or subreddit data.');
+    }
+
+    $subreddit_data = json_decode(stripslashes($subreddit_data_raw), true);
+    update_post_meta($post_id, '_arcp_subreddit_data', $subreddit_data);
+
+    wp_send_json_success('Subreddit data saved.');
+}
+
 // AJAX handler to fetch flairs for a subreddit
 add_action('wp_ajax_arcp_fetch_flairs', 'arcp_fetch_flairs_handler');
 function arcp_fetch_flairs_handler() {
@@ -361,6 +408,7 @@ function arcp_fetch_flairs_handler() {
 
     wp_send_json_success($flairs);
 }
+
 // AJAX handler for manual submission
 add_action('wp_ajax_arcp_manual_submit', 'arcp_manual_submit_handler');
 function arcp_manual_submit_handler() {
@@ -369,14 +417,8 @@ function arcp_manual_submit_handler() {
     $post_id = intval($_POST['post_id']);
     $subreddit_data_raw = $_POST['subreddit_data'] ?? '';
 
-    // Debug raw input
-    error_log("ARCP: Raw subreddit data received: $subreddit_data_raw");
-
     // Decode subreddit data
     $subreddit_data = json_decode(stripslashes($subreddit_data_raw), true);
-
-    // Debug parsed input
-    error_log("ARCP: Parsed subreddit data: " . print_r($subreddit_data, true));
 
     if (!$post_id || empty($subreddit_data)) {
         wp_send_json_error('Invalid post ID or subreddit data.');
@@ -398,7 +440,7 @@ function arcp_manual_submit_handler() {
         $flair_id = sanitize_text_field($entry['flair_id'] ?? '');
 
         if (empty($subreddit)) {
-            $results[] = "Subreddit is missing.";
+            $results[] = "Failed to post to r/$subreddit: Subreddit is missing.";
             continue;
         }
 
@@ -411,8 +453,15 @@ function arcp_manual_submit_handler() {
         }
     }
 
-    wp_send_json_success(implode("\n", $results));
+    // Combine results into a plain text message
+    $message = "Post Results:\n\n";
+    foreach ($results as $result) {
+        $message .= $result . "\n";
+    }
+
+    wp_send_json_success($message);
 }
+
 // Submit post to Reddit
 function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_url, $subreddit, $flair_id = null) {
     $post_data = [
@@ -420,7 +469,7 @@ function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_
         'kind'  => 'link',
         'url'   => $image_url,
         'sr'    => $subreddit,
-        'text'  => $excerpt . "\n\n[Read more]($post_url)",
+        'text'  => $excerpt . " [Continue Reading]($post_url)",
     ];
 
     if ($flair_id) {
@@ -446,11 +495,22 @@ function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
 
-    // Handle API response
-    if (isset($body['json']['data']['url'])) {
+    // Check for success explicitly
+    if (isset($body['success']) && $body['success'] == 1) {
+        // Extract URL if provided
+        $post_url = $body['jquery'][10][3][0] ?? null;
         return [
             'success' => true,
-            'url'     => $body['json']['data']['url'],
+            'url'     => $post_url ?: "https://www.reddit.com/r/$subreddit/",
+        ];
+    }
+
+    // Handle specific errors from Reddit
+    if (isset($body['json']['errors']) && is_array($body['json']['errors'])) {
+        $errors = array_map(fn($e) => $e[1], $body['json']['errors']); // Extract error messages
+        return [
+            'success' => false,
+            'error'   => implode(', ', $errors),
         ];
     }
 
@@ -461,6 +521,8 @@ function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_
         'error'   => 'Unexpected response from Reddit.',
     ];
 }
+
+
 // Hook into post publishing
 add_action('publish_post', 'arcp_auto_cross_post');
 function arcp_auto_cross_post($post_id) {
