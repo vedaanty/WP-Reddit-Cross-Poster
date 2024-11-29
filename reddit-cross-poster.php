@@ -3,7 +3,7 @@
 Plugin Name: Wordpress Reddit Cross-Poster
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: An plugin for cross-posting WordPress posts to Reddit with dynamic flair support.
-Version: 2.0.1
+Version: 2.1.0
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
 */
@@ -64,27 +64,51 @@ function arcp_add_settings_page() {
 
 // Render settings page
 function arcp_render_settings_page() {
-    if (isset($_GET['arcp_auth']) && $_GET['arcp_auth'] === '1') {
+	 if (isset($_GET['arcp_auth']) && $_GET['arcp_auth'] === '1') {
         arcp_start_oauth();
-    }
-
+    } 
     if (isset($_GET['code'])) {
         arcp_handle_oauth_callback($_GET['code']);
     }
-
     ?>
     <div class="wrap">
         <h1>Advanced Reddit Cross-Poster Settings</h1>
-        <form method="post" action="options.php">
-            <?php
-            settings_fields('arcp_settings_group');
-            do_settings_sections('arcp-settings');
-            submit_button();
-            ?>
-        </form>
-        <h2>OAuth Authentication</h2>
-        <p>Authenticate with Reddit to enable posting.</p>
-        <a href="<?php echo esc_url(add_query_arg('arcp_auth', '1')); ?>" class="button button-primary">Authenticate with Reddit</a>
+        <div class="arcp-settings">
+            <form method="post" action="options.php">
+                <?php
+                // Register settings fields
+                settings_fields('arcp_settings_group');
+                ?>
+                <!-- API Authentication Section -->
+                <div class="field-group">
+                    <h2>API Authentication</h2>
+                    <p>Connect to Reddit using your API credentials. Ensure the redirect URI is correctly set in the <a href="https://www.reddit.com/prefs/apps" target="_blank">Reddit Developer Portal</a>.</p>
+                    <?php do_settings_fields('arcp-settings', 'arcp_main_settings'); ?>
+                    <h2>OAuth Authentication</h2>
+                    <p>Authenticate with Reddit to enable posting.</p>
+                    <a href="<?php echo esc_url(add_query_arg('arcp_auth', '1')); ?>" class="button button-primary">Authenticate with Reddit</a>
+					<p style="margin-top: 15px; font-size: 14px;">
+            			<strong>Status:</strong> 
+            			<?php if (get_option('arcp_access_token')) : ?>
+                			<span style="color: green;">Logged in</span>
+            			<?php else : ?>
+                			<span style="color: red;">Not logged in</span>
+            			<?php endif; ?>
+        			</p>
+                </div>
+                <!-- Post Settings Section -->
+                <div class="field-group">
+                    <h2>Post Settings</h2>
+                    <p>Customize how your posts appear on Reddit.</p>
+                    <?php do_settings_fields('arcp-settings', 'arcp_post_settings'); ?>
+                </div>
+
+                <!-- Save Button -->
+                <div class="submit-section">
+                    <?php submit_button('Save Settings', 'primary', 'submit', false, ['class' => 'submit-button']); ?>
+                </div>
+            </form>
+        </div>
     </div>
     <?php
 }
@@ -113,6 +137,61 @@ function arcp_render_client_secret_field() {
 	echo '<p class="description">Your Reddit API Client Secret. Get this from the <a href="https://www.reddit.com/prefs/apps" target="_blank">Reddit Developer Portal</a>.</p>';
 	echo '<p>Ensure that the redirect URI in the <a href="https://www.reddit.com/prefs/apps" target="_blank">Reddit Developer Portal</a> is set to:</p>';
     echo esc_html(ARCP_REDIRECT_URI);
+}
+
+// Register new settings fields
+add_action('admin_init', 'arcp_register_additional_settings');
+function arcp_register_additional_settings() {
+    add_settings_section('arcp_post_settings', 'Post Settings', null, 'arcp-settings');
+
+    add_settings_field('arcp_post_type', 'Post Type', 'arcp_render_post_type_field', 'arcp-settings', 'arcp_post_settings');
+    add_settings_field('arcp_custom_text', 'Custom Text', 'arcp_render_custom_text_field', 'arcp-settings', 'arcp_post_settings');
+    add_settings_field('arcp_disable_excerpt', 'Disable Excerpt', 'arcp_render_disable_excerpt_field', 'arcp-settings', 'arcp_post_settings');
+    add_settings_field('arcp_link_text', 'Link Text', 'arcp_render_link_text_field', 'arcp-settings', 'arcp_post_settings');
+
+    register_setting('arcp_settings_group', 'arcp_post_type');
+    register_setting('arcp_settings_group', 'arcp_custom_text', ['sanitize_callback' => 'sanitize_text_field']);
+    register_setting('arcp_settings_group', 'arcp_disable_excerpt', ['sanitize_callback' => 'rest_sanitize_boolean']);
+    register_setting('arcp_settings_group', 'arcp_link_text', ['sanitize_callback' => 'sanitize_text_field']);
+}
+
+// Render Post Type Field
+function arcp_render_post_type_field() {
+    $post_type = get_option('arcp_post_type', 'image');
+    ?>
+    <select name="arcp_post_type">
+        <option value="image" <?php selected($post_type, 'image'); ?>>Featured Image</option>
+        <option value="link" <?php selected($post_type, 'link'); ?>>Article Link</option>
+    </select>
+    <p class="description">Choose whether to post the featured image or the article link. Defaults to featured image.</p>
+    <?php
+}
+
+// Render Custom Text Field
+function arcp_render_custom_text_field() {
+    $custom_text = get_option('arcp_custom_text', '');
+    ?>
+    <input type="text" name="arcp_custom_text" value="<?php echo esc_attr($custom_text); ?>" placeholder="Enter custom text">
+    <p class="description">Replace the excerpt with custom text (if provided).</p>
+    <?php
+}
+
+// Render Disable Excerpt Field
+function arcp_render_disable_excerpt_field() {
+    $disable_excerpt = get_option('arcp_disable_excerpt', false);
+    ?>
+    <input type="checkbox" name="arcp_disable_excerpt" value="1" <?php checked($disable_excerpt, true); ?>>
+    <p class="description">Disable excerpt entirely. Only the custom text or link will be posted.</p>
+    <?php
+}
+
+// Render Link Text Field
+function arcp_render_link_text_field() {
+    $link_text = get_option('arcp_link_text', 'Read more');
+    ?>
+    <input type="text" name="arcp_link_text" value="<?php echo esc_attr($link_text); ?>">
+    <p class="description">Specify the link text to include with the post. Leave empty to omit the link.</p>
+    <?php
 }
 
 // Start OAuth process
@@ -464,14 +543,37 @@ function arcp_manual_submit_handler() {
 
 // Submit post to Reddit
 function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_url, $subreddit, $flair_id = null) {
+    // Retrieve settings
+    $post_type = get_option('arcp_post_type', 'image');
+    $custom_text = get_option('arcp_custom_text', '');
+    $disable_excerpt = get_option('arcp_disable_excerpt', false);
+    $link_text = get_option('arcp_link_text', 'Read more');
+
+    // Generate the post excerpt
+    if ($disable_excerpt) {
+        $post_excerpt = '';
+    } elseif (!empty($custom_text)) {
+        $post_excerpt = $custom_text;
+    } else {
+        $post_excerpt = $excerpt; // Use full excerpt without trimming
+    }
+
+    // Append the article link if the link text is enabled
+    if (!empty($link_text) && !$disable_excerpt) {
+        $post_excerpt .= " [$link_text]($post_url)";
+    }
+
+    // Determine whether to post as an image or a link
+    $is_image_post = ($post_type === 'image' && !empty($image_url));
     $post_data = [
         'title' => html_entity_decode($title, ENT_QUOTES),
-        'kind'  => 'link',
-        'url'   => $image_url,
+        'kind'  => $is_image_post ? 'link' : 'link',
+        'url'   => $is_image_post ? $image_url : $post_url,
         'sr'    => $subreddit,
-        'text'  => $excerpt . " [Continue Reading]($post_url)",
+        'text'  => $post_excerpt,
     ];
 
+    // Add flair if specified
     if ($flair_id) {
         $post_data['flair_id'] = $flair_id;
     }
@@ -485,43 +587,24 @@ function arcp_submit_post_to_reddit($token, $title, $image_url, $excerpt, $post_
         'body' => $post_data,
     ]);
 
+    // Handle API response
     if (is_wp_error($response)) {
-        error_log("ARCP: Post submission error for r/$subreddit - " . $response->get_error_message());
-        return [
-            'success' => false,
-            'error'   => $response->get_error_message(),
-        ];
+        error_log("ARCP: Post submission error - " . $response->get_error_message());
+        return ['success' => false, 'error' => $response->get_error_message()];
     }
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
 
-    // Check for success explicitly
+    // Check for successful submission
     if (isset($body['success']) && $body['success'] == 1) {
-        // Extract URL if provided
-        $post_url = $body['jquery'][10][3][0] ?? null;
-        return [
-            'success' => true,
-            'url'     => $post_url ?: "https://www.reddit.com/r/$subreddit/",
-        ];
+        $reddit_post_url = $body['jquery'][10][3][0] ?? null;
+        return ['success' => true, 'url' => $reddit_post_url ?: "https://www.reddit.com/r/$subreddit/"];
     }
 
-    // Handle specific errors from Reddit
-    if (isset($body['json']['errors']) && is_array($body['json']['errors'])) {
-        $errors = array_map(fn($e) => $e[1], $body['json']['errors']); // Extract error messages
-        return [
-            'success' => false,
-            'error'   => implode(', ', $errors),
-        ];
-    }
-
-    // Log unexpected responses
-    error_log("ARCP: Unexpected response from Reddit for r/$subreddit - " . print_r($body, true));
-    return [
-        'success' => false,
-        'error'   => 'Unexpected response from Reddit.',
-    ];
+    // Log and handle unexpected responses
+    error_log("ARCP: Unexpected response from Reddit - " . print_r($body, true));
+    return ['success' => false, 'error' => 'Unexpected response from Reddit.'];
 }
-
 
 // Hook into post publishing
 add_action('publish_post', 'arcp_auto_cross_post');
