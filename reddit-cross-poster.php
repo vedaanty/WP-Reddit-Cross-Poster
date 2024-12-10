@@ -6,6 +6,8 @@ Description: A plugin for cross-posting WordPress posts to Reddit with dynamic f
 Version: 3.0.0
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
+License: GPLv3 or later
+License URI: https://www.gnu.org/licenses/gpl-3.0.en.html
 */
 
 if (!defined('ABSPATH')) {
