@@ -55,6 +55,9 @@ The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of yo
 - Use the **Test Connection** button in the settings to verify Reddit API connectivity.
 - All errors and retry attempts are logged for easy troubleshooting.
 
+<br>
+Happy to respond to any problems if you create an issue. 
+
 ## 🤔 FAQ
 
 ### Q: Can I post to multiple subreddits at once?
