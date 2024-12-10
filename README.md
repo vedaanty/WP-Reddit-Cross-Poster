@@ -28,7 +28,7 @@ The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of yo
 
 ## 🚀 Installation
 
-1. Download the plugin files and upload them to your WordPress `wp-content/plugins/` directory.
+1. Download the plugin files and upload them as a new Plugin
 2. Activate the plugin from the **Plugins** section in the WordPress admin dashboard.
 3. Navigate to **ARCP Settings** under the WordPress admin menu to configure the plugin.
 
