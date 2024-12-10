@@ -72,9 +72,9 @@ The plugin automatically detects scheduled WordPress posts turning from schedule
 
 ## 🎉 Contributing/Future Roadmap
 
-We welcome contributions! Feel free to open issues or submit pull requests on our [GitHub repository](https://github.com/vedaanty/reddit-crosspost-plugin).
-This plugin is used in one of my active projects, so if it ever breaks I'll probably end up fixing it. Not exactly sure what additional features can be added, but I am happy to listen to suggestions and squash bugs if you find them!
-I'm quite new to making wordpress plugins, so please ignore any wordpress faux pas that may have been made.
+We welcome contributions! Feel free to open issues or submit pull requests on our [GitHub repository](https://github.com/vedaanty/reddit-crosspost-plugin). <br>
+This plugin is used in one of my active projects, so if it ever breaks I'll probably end up fixing it. Not exactly sure what additional features can be added, but I am happy to listen to suggestions and squash bugs if you find them! <br>
+I'm quite new to making wordpress plugins, so please ignore any wordpress mistakes that may have been made.
 
 ### Known Issues/Wanted Improvements: 
 - No flair dropdown in ARCP admin menu preset editing
