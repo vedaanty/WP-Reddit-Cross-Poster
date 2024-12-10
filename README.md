@@ -3,8 +3,6 @@
 
 The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of your WordPress blog content to Reddit. Whether you're managing a personal blog or a large-scale publication, this plugin ensures your content reaches Reddit's vast audience with ease.
 
----
-
 ## 🌟 Features
 
 - **Seamless Integration**: Automatically cross-post your WordPress posts to multiple Reddit subreddits.
@@ -28,15 +26,11 @@ The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of yo
   - Edit, delete, and manage presets.
   - Test Reddit API connections directly from the settings.
 
----
-
 ## 🚀 Installation
 
 1. Download the plugin files and upload them to your WordPress `wp-content/plugins/` directory.
 2. Activate the plugin from the **Plugins** section in the WordPress admin dashboard.
 3. Navigate to **ARCP Settings** under the WordPress admin menu to configure the plugin.
-
----
 
 ## 🛠️ Setup and Usage
 
@@ -55,15 +49,11 @@ The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of yo
 - Enable automatic posting for scheduled posts via the **ARCP Settings** page.
 - Posts will be published to Reddit automatically when they go live on WordPress.
 
----
-
 ## 🛡️ Debugging and Support
 
 - Enable **Debug Mode** in the settings for detailed logs of API requests and responses.
 - Use the **Test Connection** button in the settings to verify Reddit API connectivity.
 - All errors and retry attempts are logged for easy troubleshooting.
-
----
 
 ## 🤔 FAQ
 
@@ -79,8 +69,6 @@ Presets can be created, edited, and deleted directly from the settings page or t
 
 ### Q: How is scheduling handled?
 The plugin automatically detects scheduled WordPress posts turning from scheduled to published and thencross-posts them to Reddit based on the subreddit configurations in the post.
-
----
 
 ## 🎉 Contributing/Future Roadmap
 
