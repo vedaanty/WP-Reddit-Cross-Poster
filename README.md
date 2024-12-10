@@ -1,5 +1,5 @@
 
-# WP Reddit Cross-Poster Plugin
+# WP Reddit Cross-Poster
 
 The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of your WordPress blog content to Reddit. Whether you're managing a personal blog or a large-scale publication, this plugin ensures your content reaches Reddit's vast audience with ease.
 
