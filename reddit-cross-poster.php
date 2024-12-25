@@ -3,7 +3,7 @@
 Plugin Name: WP Reddit Cross-Poster
 Plugin URI: https://github.com/vedaanty/reddit-crosspost-plugin/
 Description: A plugin for cross-posting WordPress posts to Reddit with dynamic flair support, presets, logging, and user-friendly UI.
-Version: 3.0.0
+Version: 3.0.1
 Author: Vedaant
 Author URI: https://github.com/vedaanty/
 License: GPLv3 or later
@@ -1290,12 +1290,20 @@ function arcp_post_comment_to_reddit($token, $thing_id, $comment_text) {
 }
 
 // Auto cross post on publish
-add_action('publish_post', 'arcp_auto_cross_post');
-function arcp_auto_cross_post($post_id) {
-    // Prevent auto-posting during revisions or autosaves
-    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+add_action('transition_post_status', 'arcp_auto_cross_post', 10, 3);
+function arcp_auto_cross_post($new_status, $old_status, $post) {
+    // Ensure we are dealing with a post and not a revision or autosave
+    if (wp_is_post_revision($post->ID) || wp_is_post_autosave($post->ID)) {
         return;
     }
+
+    // Trigger auto-cross-post only if transitioning from 'scheduled' to 'publish'
+    // or from any other status to 'publish' (first-time publishing)
+    if ($new_status !== 'publish' || $old_status === 'publish') {
+        return;
+    }
+
+    $post_id = $post->ID;
 
     // Check if "Disable Scheduled Auto-Posting" is enabled in admin settings
     $disable_auto_posting = get_option('arcp_disable_scheduled_auto_post', false);
