@@ -17,7 +17,7 @@ The **WordPress Reddit Cross-Poster Plugin** allows seamless cross-posting of yo
 - **Customizable Post Options**:
   - Post featured images or article links.
   - Include excerpts, custom text, or append a "Read more" link.
-  - Option to post excerpts in comments.
+  - Option to post excerpts in comments. (Helps bypass subreddit spam filters)
 - **Error Handling and Debugging**:
   - Retry mechanisms for transient errors or rate limits.
   - Debug mode for detailed logging.
